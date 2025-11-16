@@ -1,46 +1,52 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Barcode Authentication</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 20px;
-      transition: background-color 0.5s;
-    }
-    video {
-      max-width: 100%;
-      width: 300px;
-      border: 1px solid #ccc;
-    }
-    #result {
-      margin-top: 20px;
-      font-size: 1.5em;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body>
-  <h1>Scan Barcode</h1>
-  <video id="video" autoplay></video>
-  <div id="result">No code scanned yet.</div>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Barcode Authenticator</title>
 
-  <!-- Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-  <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
-
-  <!-- Google Analytics -->
+  <!-- Google tag (gtag.js) - replace with your ID if needed -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-YW1VWYLYBQ"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'YOUR_GA_MEASUREMENT_ID');
+    gtag('config', 'G-YW1VWYLYBQ');
   </script>
 
-  <script src="main.js"></script>
+  <style>
+    :root{--green:#28a745;--red:#dc3545;--bg:#f4f6f8;--card:#ffffff}
+    body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:var(--card);padding:28px;border-radius:10px;box-shadow:0 6px 20px rgba(10,20,30,0.08);width:100%;max-width:760px;text-align:center}
+    h1{margin:0 0 14px;font-size:20px}
+    p.lead{margin:0 0 18px;color:#333}
+    .row{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
+    input#code{width:420px;max-width:100%;padding:12px 14px;font-size:18px;border:2px solid #ddd;border-radius:8px;outline:none}
+    button#check{padding:12px 18px;font-size:16px;border-radius:8px;border:0;background:#0b74de;color:#fff;cursor:pointer}
+    button#clear{background:#6c757d}
+    #result{margin-top:18px;padding:16px;border-radius:8px;display:none;font-weight:700;color:#fff}
+    .small{font-size:13px;color:#666;margin-top:8px}
+    /* camera button (optional - not enabled by default) */
+    button#camera{background:#17a2b8}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Barcode Authenticator</h1>
+    <p class="lead">Scan with handheld scanner or paste the barcode below, then press Enter or click <strong>Check</strong>.</p>
+
+    <div class="row">
+      <input id="code" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Scan or paste 28-character barcode here" />
+      <button id="check">Check</button>
+      <button id="clear">Clear</button>
+      <!-- camera button left for future use -->
+      <!-- <button id="camera">Camera</button> -->
+    </div>
+
+    <div id="result" role="status" aria-live="polite"></div>
+    <div class="small">Loaded codes: <span id="count">0</span>. Exact matches only. No spaces.</div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
-
