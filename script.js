@@ -1,5 +1,5 @@
-// script.js - Secure version with AES encryption - MULTIPLE PREFIXES
-const VALID_PREFIXES = ["7561097010000001", "7561097010000002"]; // Both prefixes now valid
+// script.js - Secure version with AES encryption - MULTIPLE PREFIXES + AUTO-AUTHENTICATE
+const VALID_PREFIXES = ["7561097010000001", "7561097010000002"];
 const CODE_LEN = 28;
 const encryptedDataUrl = 'encrypted-barcodes.json';
 const ENCRYPTION_KEY = "my-super-secret-key-32-chars-long!"; // CHANGE THIS!
@@ -13,6 +13,7 @@ const loadingDiv = document.getElementById('loading');
 
 let decryptedCodesSet = new Set();
 let isDatabaseLoaded = false;
+let autoCheckTimeout = null;
 
 // Show/hide loading
 function showLoading(show) {
@@ -93,16 +94,123 @@ function basicFormatOkay(code) {
   if (!hasValidPrefix) return false;
   
   // Validate the remaining characters
-  const remainingChars = code.slice(16); // After 16-character prefix
+  const remainingChars = code.slice(16);
   return /^[0-9a-z]+$/.test(remainingChars);
 }
 
 // Get prefix type for analytics
 function getPrefixType(code) {
-    if (code.startsWith("7561097010000001")) return "type-1";
-    if (code.startsWith("7561097010000002")) return "type-2";
-    return "unknown";
+    if (code.startsWith("7561097010000001")) return "Type-1";
+    if (code.startsWith("7561097010000002")) return "Type-2";
+    return "Unknown";
 }
+
+// Auto-check function with debouncing
+function autoCheck() {
+    if (!isDatabaseLoaded) return;
+    
+    const raw = codeInput.value.trim();
+    const code = raw.toLowerCase();
+    
+    // Clear previous timeout
+    if (autoCheckTimeout) {
+        clearTimeout(autoCheckTimeout);
+    }
+    
+    // Set new timeout for auto-check (300ms after user stops typing)
+    autoCheckTimeout = setTimeout(() => {
+        if (code && code.length === CODE_LEN) {
+            performCheck();
+        }
+    }, 300);
+}
+
+// Perform check
+function performCheck() {
+  if (!isDatabaseLoaded) {
+    showResult(false, 'Database not ready. Please wait.');
+    return;
+  }
+
+  const raw = codeInput.value.trim();
+  const code = raw.toLowerCase();
+
+  if (!code) {
+    resultDiv.style.display = 'none';
+    return;
+  }
+  
+  if (!basicFormatOkay(code)) {
+    showResult(false, 'COUNTERFEIT ✗ — invalid format or prefix');
+    logAnalytics(code, 'format-invalid');
+    return;
+  }
+
+  const isGenuine = decryptedCodesSet.has(code);
+  if (isGenuine) {
+    const prefixType = getPrefixType(code);
+    showResult(true, `GENUINE ✓ (${prefixType})`);
+    logAnalytics(code, 'genuine', prefixType);
+  } else {
+    showResult(false, 'COUNTERFEIT ✗');
+    logAnalytics(code, 'counterfeit');
+  }
+}
+
+// Enhanced analytics logging with prefix type
+function logAnalytics(code, result, prefixType = null) {
+  if (typeof gtag === 'function') {
+    try {
+      gtag('event', 'barcode_check', {
+        'barcode_prefix': code.substring(0, 16),
+        'barcode_type': prefixType || getPrefixType(code),
+        'result': result,
+        'page_location': window.location.href,
+        'auto_authenticated': 'true'
+      });
+    } catch (e) { /* ignore analytics errors */ }
+  }
+}
+
+// Clear function
+function clearInput() {
+    codeInput.value = '';
+    resultDiv.style.display = 'none';
+    codeInput.focus();
+    
+    // Clear any pending auto-check
+    if (autoCheckTimeout) {
+        clearTimeout(autoCheckTimeout);
+    }
+}
+
+// Event listeners
+checkBtn.addEventListener('click', performCheck);
+clearBtn.addEventListener('click', clearInput);
+
+// Auto-authentication events
+codeInput.addEventListener('input', autoCheck);
+codeInput.addEventListener('paste', autoCheck);
+
+// Scanner detection - many scanners send Enter key after scanning
+codeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        // If we already auto-checked, don't check again
+        // If not, perform the check
+        if (resultDiv.style.display === 'none') {
+            performCheck();
+        }
+        e.preventDefault();
+    }
+});
+
+// Focus the input field when page loads
+window.addEventListener('load', () => {
+    codeInput.focus();
+});
+
+// Initialize
+loadEncryptedCodes();}
 
 // Perform check
 function performCheck() {
@@ -164,3 +272,4 @@ codeInput.addEventListener('keydown', (e) => {
 
 // Initialize
 loadEncryptedCodes();
+
