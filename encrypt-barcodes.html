@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Barcode Encryptor - Multiple Prefixes</title>
+    <style>
+        body { font-family: Arial; margin: 40px; }
+        textarea, input { width: 100%; margin: 10px 0; padding: 10px; }
+        button { padding: 10px 20px; margin: 5px; }
+        .result { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+        .stats { background: #e8f4fd; padding: 10px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Barcode Encryption Tool - Multiple Prefixes</h2>
+    
+    <div class="stats">
+        <strong>Supported Prefixes:</strong> 7561097010000001, 7561097010000002
+    </div>
+    
+    <div>
+        <label>Encryption Key (keep this secret!):</label>
+        <input type="text" id="encryptionKey" value="my-super-secret-key-32-chars-long!" />
+    </div>
+    
+    <div>
+        <label>Paste raw barcodes (one per line, both prefixes supported):</label>
+        <textarea id="rawBarcodes" rows="15" placeholder="7561097010000001a01972000001&#10;7561097010000002b01972000002&#10;7561097010000001c01972000003&#10;..."></textarea>
+    </div>
+    
+    <button onclick="encryptBarcodes()">Encrypt All Barcodes</button>
+    <button onclick="decryptBarcodes()">Decrypt Barcodes</button>
+    
+    <div id="encryptionStats" class="stats"></div>
+    
+    <div class="result">
+        <label>Encrypted Output (save as encrypted-barcodes.json):</label>
+        <textarea id="encryptedOutput" rows="10" readonly></textarea>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        async function encryptBarcodes() {
+            const key = document.getElementById('encryptionKey').value;
+            const rawText = document.getElementById('rawBarcodes').value;
+            const barcodes = rawText.split('\n').map(b => b.trim()).filter(b => b.length === 28);
+            
+            const encryptedData = {
+                encrypted: true,
+                timestamp: new Date().toISOString(),
+                supported_prefixes: ["7561097010000001", "7561097010000002"],
+                data: []
+            };
+            
+            let prefix1Count = 0;
+            let prefix2Count = 0;
+            let otherCount = 0;
+            
+            barcodes.forEach(barcode => {
+                // Count by prefix
+                if (barcode.startsWith("7561097010000001")) {
+                    prefix1Count++;
+                } else if (barcode.startsWith("7561097010000002")) {
+                    prefix2Count++;
+                } else {
+                    otherCount++;
+                }
+                
+                // Encrypt each barcode
+                const encrypted = CryptoJS.AES.encrypt(barcode, key).toString();
+                encryptedData.data.push(encrypted);
+            });
+            
+            document.getElementById('encryptedOutput').value = JSON.stringify(encryptedData, null, 2);
+            
+            // Show statistics
+            document.getElementById('encryptionStats').innerHTML = `
+                <strong>Encryption Complete:</strong><br>
+                Total barcodes: ${barcodes.length}<br>
+                Prefix 7561097010000001: ${prefix1Count} barcodes<br>
+                Prefix 7561097010000002: ${prefix2Count} barcodes<br>
+                Other prefixes: ${otherCount} barcodes
+            `;
+        }
+        
+        function decryptBarcodes() {
+            const key = document.getElementById('encryptionKey').value;
+            const encryptedJson = document.getElementById('encryptedOutput').value;
+            
+            try {
+                const data = JSON.parse(encryptedJson);
+                let decryptedText = '';
+                
+                data.data.forEach(encryptedBarcode => {
+                    const decrypted = CryptoJS.AES.decrypt(encryptedBarcode, key).toString(CryptoJS.enc.Utf8);
+                    decryptedText += decrypted + '\n';
+                });
+                
+                document.getElementById('rawBarcodes').value = decryptedText;
+            } catch (e) {
+                alert('Decryption failed: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
