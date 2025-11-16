@@ -1,86 +1,145 @@
-// script.js
-// Strict exact-match barcode checker using raw-barcodes.txt
-
+// script.js - Secure version with AES encryption - MULTIPLE PREFIXES
+const VALID_PREFIXES = ["7561097010000001", "7561097010000002"]; // Both prefixes now valid
 const CODE_LEN = 28;
-const PREFIX = "7561097010000002"; // fixed prefix (16 chars)
-const rawUrl = 'raw-barcodes.txt'; // file must be in same folder
+const encryptedDataUrl = 'encrypted-barcodes.json';
+const ENCRYPTION_KEY = "my-super-secret-key-32-chars-long!"; // CHANGE THIS!
+
 const codeInput = document.getElementById('code');
 const checkBtn = document.getElementById('check');
 const clearBtn = document.getElementById('clear');
 const resultDiv = document.getElementById('result');
 const countSpan = document.getElementById('count');
+const loadingDiv = document.getElementById('loading');
 
-let codesSet = new Set();
+let decryptedCodesSet = new Set();
+let isDatabaseLoaded = false;
 
-// Utility: show result
+// Show/hide loading
+function showLoading(show) {
+    loadingDiv.style.display = show ? 'block' : 'none';
+}
+
+// Show result
 function showResult(isGenuine, message) {
   resultDiv.style.display = 'block';
   resultDiv.style.background = isGenuine ? 'var(--green)' : 'var(--red)';
   resultDiv.textContent = message;
 }
 
-// Load raw-barcodes.txt and put into Set
-async function loadCodes() {
-  try {
-    const res = await fetch(rawUrl, {cache: "no-store"});
-    if (!res.ok) throw new Error('Failed to load raw-barcodes.txt');
-    const text = await res.text();
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length);
-    // Only keep valid length/format lines (defensive)
-    for (const l of lines) {
-      if (l.length === CODE_LEN) codesSet.add(l);
+// Decrypt a single barcode
+function decryptBarcode(encryptedBarcode) {
+    try {
+        const decrypted = CryptoJS.AES.decrypt(encryptedBarcode, ENCRYPTION_KEY);
+        return decrypted.toString(CryptoJS.enc.Utf8);
+    } catch (error) {
+        console.error('Decryption error:', error);
+        return null;
     }
-    countSpan.textContent = codesSet.size;
-    console.log(`Loaded ${codesSet.size} codes`);
-  } catch (err) {
-    console.error(err);
-    countSpan.textContent = '0';
-    showResult(false, 'Error loading codes file. Check raw-barcodes.txt');
-  }
 }
 
-// Validate format quick checks (length + prefix + allowed chars)
+// Load and decrypt encrypted barcodes
+async function loadEncryptedCodes() {
+    showLoading(true);
+    
+    try {
+        const response = await fetch(encryptedDataUrl, {cache: "no-store"});
+        if (!response.ok) throw new Error('Failed to load encrypted database');
+        
+        const encryptedData = await response.json();
+        
+        if (!encryptedData.encrypted) {
+            throw new Error('Data file is not encrypted format');
+        }
+        
+        // Decrypt each barcode
+        let validCount = 0;
+        let prefix1Count = 0;
+        let prefix2Count = 0;
+        
+        for (const encryptedBarcode of encryptedData.data) {
+            const decrypted = decryptBarcode(encryptedBarcode);
+            if (decrypted && decrypted.length === CODE_LEN) {
+                decryptedCodesSet.add(decrypted);
+                validCount++;
+                
+                // Count by prefix for debugging
+                if (decrypted.startsWith("7561097010000001")) {
+                    prefix1Count++;
+                } else if (decrypted.startsWith("7561097010000002")) {
+                    prefix2Count++;
+                }
+            }
+        }
+        
+        countSpan.textContent = validCount;
+        isDatabaseLoaded = true;
+        console.log(`Decrypted and loaded ${validCount} barcodes (Prefix1: ${prefix1Count}, Prefix2: ${prefix2Count})`);
+        
+    } catch (error) {
+        console.error('Database loading error:', error);
+        showResult(false, 'Error: Could not load encrypted database');
+        countSpan.textContent = '0';
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Validate format with multiple prefixes
 function basicFormatOkay(code) {
   if (!code || code.length !== CODE_LEN) return false;
-  if (!code.startsWith(PREFIX)) return false;
-  // allowed characters: digits 0-9 and lowercase a-z and maybe leading zeros. We'll enforce lowercase.
-  // convert to lowercase for comparisons
-  const tail = code.slice(PREFIX.length);
-  // tail should be 12 chars: 1 letter a-z then 5 digits then 6 digits (per your spec)
-  // But we will be permissive: ensure only [0-9a-z]
-  return /^[0-9a-z]+$/.test(tail);
+  
+  // Check if code starts with any valid prefix
+  const hasValidPrefix = VALID_PREFIXES.some(prefix => code.startsWith(prefix));
+  if (!hasValidPrefix) return false;
+  
+  // Validate the remaining characters
+  const remainingChars = code.slice(16); // After 16-character prefix
+  return /^[0-9a-z]+$/.test(remainingChars);
+}
+
+// Get prefix type for analytics
+function getPrefixType(code) {
+    if (code.startsWith("7561097010000001")) return "type-1";
+    if (code.startsWith("7561097010000002")) return "type-2";
+    return "unknown";
 }
 
 // Perform check
 function performCheck() {
+  if (!isDatabaseLoaded) {
+    showResult(false, 'Database not ready. Please wait.');
+    return;
+  }
+
   const raw = codeInput.value.trim();
   const code = raw.toLowerCase();
 
   if (!code) return;
-  // basic format validation
+  
   if (!basicFormatOkay(code)) {
-    showResult(false, 'COUNTERFEIT ✗ — format invalid');
+    showResult(false, 'COUNTERFEIT ✗ — invalid format or prefix');
     logAnalytics(code, 'format-invalid');
     return;
   }
 
-  const isGenuine = codesSet.has(code);
+  const isGenuine = decryptedCodesSet.has(code);
   if (isGenuine) {
-    showResult(true, 'GENUINE ✓');
-    logAnalytics(code, 'genuine');
+    const prefixType = getPrefixType(code);
+    showResult(true, `GENUINE ✓ (Type: ${prefixType})`);
+    logAnalytics(code, 'genuine', prefixType);
   } else {
     showResult(false, 'COUNTERFEIT ✗');
     logAnalytics(code, 'counterfeit');
   }
 }
 
-// Simple analytics logging (Google Analytics gtag)
-// logs event 'barcode_check' with params barcode, result, page
-function logAnalytics(code, result) {
+// Enhanced analytics logging with prefix type
+function logAnalytics(code, result, prefixType = null) {
   if (typeof gtag === 'function') {
     try {
       gtag('event', 'barcode_check', {
-        'barcode': code,
+        'barcode_prefix': code.substring(0, 16),
+        'barcode_type': prefixType || getPrefixType(code),
         'result': result,
         'page_location': window.location.href
       });
@@ -96,7 +155,6 @@ clearBtn.addEventListener('click', () => {
   codeInput.focus();
 });
 
-// allow Enter key to trigger
 codeInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     performCheck();
@@ -104,5 +162,5 @@ codeInput.addEventListener('keydown', (e) => {
   }
 });
 
-// load on start
-loadCodes();
+// Initialize
+loadEncryptedCodes();
