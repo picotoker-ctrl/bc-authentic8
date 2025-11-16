@@ -1,105 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Barcode Encryptor - Multiple Prefixes</title>
-    <style>
-        body { font-family: Arial; margin: 40px; }
-        textarea, input { width: 100%; margin: 10px 0; padding: 10px; }
-        button { padding: 10px 20px; margin: 5px; }
-        .result { background: #f0f0f0; padding: 10px; margin: 10px 0; }
-        .stats { background: #e8f4fd; padding: 10px; margin: 10px 0; border-radius: 5px; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Barcode Authenticator</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YW1VWYLYBQ"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-YW1VWYLYBQ');
+  </script>
+
+  <!-- Include CryptoJS for decryption -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+  <style>
+    :root{--green:#28a745;--red:#dc3545;--bg:#f4f6f8;--card:#ffffff}
+    body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:var(--card);padding:28px;border-radius:10px;box-shadow:0 6px 20px rgba(10,20,30,0.08);width:100%;max-width:760px;text-align:center}
+    h1{margin:0 0 14px;font-size:20px}
+    p.lead{margin:0 0 18px;color:#333}
+    .row{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
+    input#code{width:420px;max-width:100%;padding:12px 14px;font-size:18px;border:2px solid #ddd;border-radius:8px;outline:none}
+    button#check{padding:12px 18px;font-size:16px;border-radius:8px;border:0;background:#0b74de;color:#fff;cursor:pointer}
+    button#clear{background:#6c757d}
+    #result{margin-top:18px;padding:16px;border-radius:8px;display:none;font-weight:700;color:#fff}
+    .small{font-size:13px;color:#666;margin-top:8px}
+    #loading{display:none;color:#666;margin:10px 0}
+    .prefix-info{font-size:12px;color:#888;margin-top:4px;}
+  </style>
 </head>
 <body>
-    <h2>Barcode Encryption Tool - Multiple Prefixes</h2>
-    
-    <div class="stats">
-        <strong>Supported Prefixes:</strong> 7561097010000001, 7561097010000002
-    </div>
-    
-    <div>
-        <label>Encryption Key (keep this secret!):</label>
-        <input type="text" id="encryptionKey" value="my-super-secret-key-32-chars-long!" />
-    </div>
-    
-    <div>
-        <label>Paste raw barcodes (one per line, both prefixes supported):</label>
-        <textarea id="rawBarcodes" rows="15" placeholder="7561097010000001a01972000001&#10;7561097010000002b01972000002&#10;7561097010000001c01972000003&#10;..."></textarea>
-    </div>
-    
-    <button onclick="encryptBarcodes()">Encrypt All Barcodes</button>
-    <button onclick="decryptBarcodes()">Decrypt Barcodes</button>
-    
-    <div id="encryptionStats" class="stats"></div>
-    
-    <div class="result">
-        <label>Encrypted Output (save as encrypted-barcodes.json):</label>
-        <textarea id="encryptedOutput" rows="10" readonly></textarea>
+  <div class="card">
+    <h1>Barcode Authenticator</h1>
+    <p class="lead">Scan with handheld scanner or paste the barcode below, then press Enter or click <strong>Check</strong>.</p>
+    <div class="prefix-info">Supports prefixes: 7561097010000001 and 7561097010000002</div>
+
+    <div id="loading">Loading encrypted database...</div>
+
+    <div class="row">
+      <input id="code" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Scan or paste 28-character barcode here" />
+      <button id="check">Check</button>
+      <button id="clear">Clear</button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script>
-        async function encryptBarcodes() {
-            const key = document.getElementById('encryptionKey').value;
-            const rawText = document.getElementById('rawBarcodes').value;
-            const barcodes = rawText.split('\n').map(b => b.trim()).filter(b => b.length === 28);
-            
-            const encryptedData = {
-                encrypted: true,
-                timestamp: new Date().toISOString(),
-                supported_prefixes: ["7561097010000001", "7561097010000002"],
-                data: []
-            };
-            
-            let prefix1Count = 0;
-            let prefix2Count = 0;
-            let otherCount = 0;
-            
-            barcodes.forEach(barcode => {
-                // Count by prefix
-                if (barcode.startsWith("7561097010000001")) {
-                    prefix1Count++;
-                } else if (barcode.startsWith("7561097010000002")) {
-                    prefix2Count++;
-                } else {
-                    otherCount++;
-                }
-                
-                // Encrypt each barcode
-                const encrypted = CryptoJS.AES.encrypt(barcode, key).toString();
-                encryptedData.data.push(encrypted);
-            });
-            
-            document.getElementById('encryptedOutput').value = JSON.stringify(encryptedData, null, 2);
-            
-            // Show statistics
-            document.getElementById('encryptionStats').innerHTML = `
-                <strong>Encryption Complete:</strong><br>
-                Total barcodes: ${barcodes.length}<br>
-                Prefix 7561097010000001: ${prefix1Count} barcodes<br>
-                Prefix 7561097010000002: ${prefix2Count} barcodes<br>
-                Other prefixes: ${otherCount} barcodes
-            `;
-        }
-        
-        function decryptBarcodes() {
-            const key = document.getElementById('encryptionKey').value;
-            const encryptedJson = document.getElementById('encryptedOutput').value;
-            
-            try {
-                const data = JSON.parse(encryptedJson);
-                let decryptedText = '';
-                
-                data.data.forEach(encryptedBarcode => {
-                    const decrypted = CryptoJS.AES.decrypt(encryptedBarcode, key).toString(CryptoJS.enc.Utf8);
-                    decryptedText += decrypted + '\n';
-                });
-                
-                document.getElementById('rawBarcodes').value = decryptedText;
-            } catch (e) {
-                alert('Decryption failed: ' + e.message);
-            }
-        }
-    </script>
+    <div id="result" role="status" aria-live="polite"></div>
+    <div class="small">Database loaded: <span id="count">0</span> encrypted barcodes. Exact matches only.</div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
